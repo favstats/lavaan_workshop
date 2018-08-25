@@ -1,0 +1,23 @@
+---
+title: "Data Exploring"
+output: html_notebook
+---
+
+## packages
+
+```{r}
+pacman::p_load(tidyverse, haven)
+```
+
+## data
+
+```{r}
+diss <- read_sav("data/diss.sav")
+
+diss
+```
+
+```{r}
+sjPlot::view_df(diss)
+```
+
