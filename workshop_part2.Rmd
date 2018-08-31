@@ -1,0 +1,169 @@
+---
+title: "Workshop Part II"
+author: "Fabio Votta"
+date: "1 9 2018"
+output: html_document
+---
+
+## Start
+
+In diesem Tutorial stellen wir die grundlegenden Komponenten von `lavaan` vor: die Modellsyntax, die Anpassungsfunktionen (cfa, sem und growth) und die wichtigsten Extraktorfunktionen (summary, coef, passed, inspect).
+
+Im Zentrum des lavaan-Pakets steht die "Modellsyntax". Die Modellsyntax ist eine Beschreibung des zu schätzenden Modells. In diesem Abschnitt erklären wir kurz die Elemente der Lavan-Modell-Syntax. Weitere Einzelheiten sind in den folgenden Beispielen angegeben.
+
+In der R-Umgebung hat eine Regressionsformel die folgende Form:
+
+```{r}
+"y ~ x1 + x2 + x3 + x4"
+```
+
+In dieser Formel ist die Tilde ("~") der Regressionsoperator. Auf der linken Seite des Operators haben wir die abhängige Variable (y) und auf der rechten Seite haben wir die unabhängigen Variablen, getrennt durch den Operator "+". In Lavaan ist ein typisches Modell einfach ein Satz (oder System) von Regressionsformeln, wobei einige Variablen (beginnend mit einem "f" unten) latent sein können.
+Beispielsweise:
+
+```{r}
+"y ~ f1 + f2 + x1 + x2
+f1 ~ f2 + f3
+f2 ~ f3 + x1 + x2"
+```
+
+
+Wenn wir latente Variablen in einer der Regressionsformeln haben, müssen wir sie definieren, indem wir ihre (manifesten oder latenten) Indikatoren auflisten. Wir tun dies, indem wir den speziellen Operator "= ~" verwenden, der so gelesen werden kann, wie er von. Um beispielsweise die drei latenten Variablen f1, f2 und f3 zu definieren, können wir Folgendes verwenden:
+
+```{r}
+"f1 =~ y1 + y2 + y3
+f2 =~ y4 + y5 + y6
+f3 =~ y7 + y8 + y9 + y10"
+```
+
+
+Darüber hinaus werden Varianzen und Kovarianzen mit einem 'Double Tilde'-Operator angegeben, zum Beispiel:
+
+```{r}
+"y1 ~~ y1 # Varianz
+y1 ~~ y2 # Kovarianz
+f1 ~~ f2 # Kovarianz"
+```
+
+
+Und schließlich, Abschnitte für beobachtete und latente Variablen sind einfache Regressionsformeln mit nur einem Schnittpunkt (explizit mit der Nummer '1' bezeichnet) als einziger Prädiktor:
+
+
+```{r}
+"y1 ~ 1
+f1 ~ 1"
+```
+
+Unter Verwendung dieser vier Formulierungstypen kann eine große Vielfalt latenter Variablenmodelle beschrieben werden. Die aktuelle Menge der Formel-Typen ist in der folgenden Tabelle zusammengefasst.
+
+| formula type               | operator | mnemonic           |
+|----------------------------|----------|--------------------|
+| latent variable definition | =~       | is measured by     |
+| regression                 | ~        | is regressed on    |
+| (residual) (co)variance    | ~~       | is correlated with |
+| intercept                  | ~ 1      | intercept          |
+
+
+Eine vollständige Lavan-Modell-Syntax ist einfach eine Kombination dieser Formel-Typen, die zwischen einfachen Anführungszeichen stehen. Beispielsweise:
+
+```{r}
+myModel <- '# Regressionen
+y1 + y2 ~ f1 + f2 + x1 + x2
+f1 ~ f2 + f3
+f2 ~ f3 + x1 + x2
+
+# latente Variablendefinitionen
+f1 = ~ y1 + y2 + y3
+f2 = ~ y4 + y5 + y6
+f3 = ~ y7 + y8 + y9 + y10
+
+# Varianzen und Kovarianzen
+y1 ~~ y1
+y1 ~~ y2
+f1 ~~ f2
+
+# Intercepts
+y1 ~ 1
+f1 ~ 1
+'
+```
+
+Der Codeteil oben erzeugt ein Modell-Syntax-Objekt namens myModel, das später beim Aufruf einer Funktion verwendet werden kann, die dieses Modell bei einem Dataset tatsächlich schätzt. Beachten Sie, dass Formeln auf mehrere Zeilen aufgeteilt werden können. Sie können Kommentare (beginnend mit dem Zeichen #) und Leerzeilen innerhalb der einfachen Anführungszeichen verwenden, um die Lesbarkeit der Modellsyntax zu verbessern.
+
+## CFA
+
+Lasst uns zunächst einmal das Package `lavaan` einladen.
+
+```{r}
+pacman::p_load(lavaan)
+```
+
+
+Wir beginnen mit einem einfachen Beispiel der konfirmatorischen Faktorenanalyse mit der Funktion cfa (), die eine benutzerfreundliche Funktion zur Anpassung von CFA-Modellen darstellt. Das lavaan-Paket enthält einen integrierten Datensatz namens HolzingerSwineford1939. Rufen Sie die Hilfeseite für dieses Dataset auf:
+
+```{r}
+?HolzingerSwineford1939
+```
+
+
+
+Dies ist ein "klassischer" Datensatz, der in vielen Veröffentlichungen und Büchern über Strukturelle Gleichungsmodellierung (SEM) verwendet wird, einschließlich einiger Handbücher kommerzieller SEM-Softwarepakete. Die Daten bestehen aus Mentalfähigkeitstest-Scores von Kindern der siebten und achten Klasse aus zwei verschiedenen Schulen (Pasteur und Grant-White). In unserer Version des Datasets sind nur 9 der ursprünglichen 26 Tests enthalten. Ein CFA-Modell, das häufig für diese 9 Variablen vorgeschlagen wird, besteht aus drei latenten Variablen (oder Faktoren) mit jeweils drei Indikatoren:
+
++ ein visueller Faktor, der durch 3 Variablen gemessen wird: x1, x2 und x3
++ ein Textfaktor, der durch 3 Variablen gemessen wird: x4, x5 und x6
++ ein Geschwindigkeitsfaktor, der durch 3 Variablen gemessen wird: x7, x8 und x9
+
+Ein 3-Faktor-CFA-Beispiel Die entsprechende lavaan-Syntax zur Angabe dieses Modells lautet wie folgt:
+
+```{r}
+"visuell = ~ x1 + x2 + x3
+textuell = ~ x4 + x5 + x6
+Geschwindigkeit = ~ x7 + x8 + x9"
+```
+
+In diesem Beispiel enthält die Modellsyntax nur drei "latente Variablendefinitionen". Jede Formel hat folgendes Format:
+
+`latente Variable =~ Indikator1 + Indikator2 + Indikator3`
+
+Wir nennen diese Ausdrücke latente Variablendefinitionen, weil sie definieren, wie sich die latenten Variablen durch eine Menge beobachteter (oder manifester) Variablen manifestieren, die oft als "Indikatoren" bezeichnet werden. Beachten Sie, dass der spezielle Operator "=~" in der Mitte aus einem Zeichen ("=") und einer Tilde ("~") besteht, die nebeneinander stehen. Der Grund, warum diese Modell-Syntax so kurz ist, ist, dass die Funktion hinter den Kulissen mehrere Dinge erledigt. Erstens wird standardmäßig der Faktor, der den ersten Indikator einer latenten Variablen lädt, auf 1 festgelegt, wodurch der Maßstab der latenten Variablen festgelegt wird. Zweitens werden Restabweichungen automatisch hinzugefügt. Und drittens sind alle exogenen latenten Variablen standardmäßig korreliert. Auf diese Weise kann die Modell-Syntax kurz gehalten werden. Auf der anderen Seite behält der Benutzer die Kontrolle, da all dieses "Standard" -Verhalten überschrieben und / oder ausgeschaltet werden kann.
+
+Wir können die Modellsyntax unter Verwendung der einfachen Anführungszeichen eingeben:
+
+```{r}
+HS.model <- "visuell = ~ x1 + x2 + x3
+textuell = ~ x4 + x5 + x6
+Geschwindigkeit = ~ x7 + x8 + x9"
+```
+
+Wir können das Modell nun wie folgt anpassen:
+
+
+```{r}
+fit <- cfa (HS.model, data = HolzingerSwineford1939)
+```
+
+
+Die Funktion cfa () ist eine dedizierte Funktion zur Anpassung konfirmatorischer Faktorenanalyse-Modelle. Das erste Argument ist das benutzerdefinierte Modell. Das zweite Argument ist der Datensatz, der die beobachteten Variablen enthält. Sobald das Modell angepasst wurde, bietet die Funktion summary () eine schöne Zusammenfassung des angepassten Modells:
+
+
+```{r}
+summary(fit, fit.measures = TRUE)
+```
+
+Die Ausgabe besteht aus drei Teilen. Die ersten sechs Zeilen heißen Header. Der Header enthält folgende Informationen:
+
++ die lavaan Versionsnummer
++ lavaan konvergierte normal oder nicht und wie viele Iterationen wurden benötigt
++ die Anzahl der Beobachtungen, die effektiv in der Analyse verwendet wurden
++ der Schätzer, der verwendet wurde, um die Parameterwerte zu erhalten (hier: ML)
++ die Modellteststatistik, die Freiheitsgrade und ein entsprechender p-Wert
+
+Der nächste Abschnitt enthält zusätzliche Fit-Maße und wird nur angezeigt, weil wir das optionale Argument fit.measures = TRUE verwenden. Es beginnt mit dem Modell-Test-Basislinienmodell und endet mit dem Wert für SRMR. Der letzte Abschnitt enthält die Parameterschätzer. Es beginnt mit Informationen über die Standardfehler (wenn die Informationsmatrix erwartet oder beobachtet wird und wenn die Standardfehler Standard, Robust oder basierend auf dem Bootstrap sind). Dann tabelliert es alle freien (und festen) Parameter, die im Modell enthalten waren. Typischerweise werden zuerst die latenten Variablen gezeigt, gefolgt von Kovarianzen und (Rest-) Varianzen. Die erste Spalte (Schätzung) enthält den (geschätzten oder festen) Parameterwert für jeden Modellparameter; die zweite Spalte (Std.err) enthält den Standardfehler für jeden geschätzten Parameter; die dritte Spalte (Z-Wert) enthält die Wald-Statistik (die einfach durch Division des Parameterwerts durch ihren Standardfehler erhalten wird) und die letzte Spalte (P (> | z |)) enthält den p-Wert zum Testen der Null Hypothese, dass der Parameter in der Population gleich null ist.
+
+
+Einfach diesen Code kopieren und in R einfügen, sollte funktionieren. Die Syntax veranschaulicht den typischen Workflow im Paket "lavaan":
+
+1. Geben Sie Ihr Modell mit der Lavan-Modell-Syntax an. In diesem Beispiel wurden nur Definitionen für latente Variablen verwendet. In den folgenden Beispielen werden andere Formeltypen verwendet.
+
+2. Passen Sie das Modell an. Dies erfordert einen Datensatz, der die beobachteten Variablen (oder alternativ die Stichproben-Kovarianzmatrix und die Anzahl der Beobachtungen) enthält. In diesem Beispiel haben wir die Funktion cfa () verwendet. Andere Funktionen im lavaan-Paket sind sem () und growth () für die Anpassung von Modellen mit vollständiger Strukturgleichung bzw. Wachstumskurvenmodellen. Alle drei Funktionen sind so genannte benutzerfreundliche Funktionen, in dem Sinne, dass sie sich automatisch um viele Details kümmern, so dass wir die Modell-Syntax einfach und prägnant halten können. Wenn Sie nicht standardmäßige Modelle anpassen möchten oder wenn Ihnen die Idee, dass Dinge automatisch erledigt werden, nicht gefällt, können Sie stattdessen die untere Funktion lavaan () verwenden, wo Sie die volle Kontrolle haben.
+
+3. Extrahieren Sie Informationen aus dem angepassten Modell. Dies kann eine lange ausführliche Zusammenfassung sein oder nur eine einzelne Zahl (z. B. der RMSEA-Wert). Im Sinne von R bekommen Sie nur, wonach Sie gefragt haben. Wir versuchen, keine unnötigen Informationen auszugeben, die Sie ohnehin ignorieren würden.

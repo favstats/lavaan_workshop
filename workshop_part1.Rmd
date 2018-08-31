@@ -5,8 +5,6 @@ date: "31 8 2018"
 output: html_document
 ---
 
-
-
 ## Start
 
 R ist eine Open-Source-Programmiersprache welche speziell für statistische Berechnungen und Visualisierung von Daten und Modellen entwickelt wurde. 
