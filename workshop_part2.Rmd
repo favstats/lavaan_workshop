@@ -1,15 +1,17 @@
 ---
 title: "Workshop Part II"
 author: "Fabio Votta"
-date: "1 9 2018"
+date: "3 9 2018"
 output: html_document
 ---
 
 ## Start
 
-In diesem Tutorial stellen wir die grundlegenden Komponenten von `lavaan` vor: die Modellsyntax, die Anpassungsfunktionen (cfa, sem und growth) und die wichtigsten Extraktorfunktionen (summary, coef, passed, inspect).
+In diesem Tutorial beschäftigen uns mit den grundlegenden Komponenten von `lavaan`: die Modellsyntax, die Modellfunktionen (cfa, sem und growth) und die wichtigsten Extraktionsfunktionen (summary, parameterEstimates, fitmeasures).
 
-Im Zentrum des lavaan-Pakets steht die "Modellsyntax". Die Modellsyntax ist eine Beschreibung des zu schätzenden Modells. In diesem Abschnitt erklären wir kurz die Elemente der Lavan-Modell-Syntax. Weitere Einzelheiten sind in den folgenden Beispielen angegeben.
+## Modellsyntax
+
+Im Zentrum des lavaan-Pakets steht die "Modellsyntax". Die Modellsyntax ist eine Beschreibung des zu schätzenden Modells.
 
 In der R-Umgebung hat eine Regressionsformel die folgende Form:
 
@@ -17,17 +19,15 @@ In der R-Umgebung hat eine Regressionsformel die folgende Form:
 "y ~ x1 + x2 + x3 + x4"
 ```
 
-In dieser Formel ist die Tilde ("~") der Regressionsoperator. Auf der linken Seite des Operators haben wir die abhängige Variable (y) und auf der rechten Seite haben wir die unabhängigen Variablen, getrennt durch den Operator "+". In Lavaan ist ein typisches Modell einfach ein Satz (oder System) von Regressionsformeln, wobei einige Variablen (beginnend mit einem "f" unten) latent sein können.
-Beispielsweise:
+Wollen wir mehrere Modelle spezifizieren, so können wir das auf folgende Art und Weise tun:
 
 ```{r}
-"y ~ f1 + f2 + x1 + x2
+"y1 ~ f1 + f2 + x1 + x2
 f1 ~ f2 + f3
 f2 ~ f3 + x1 + x2"
 ```
 
-
-Wenn wir latente Variablen in einer der Regressionsformeln haben, müssen wir sie definieren, indem wir ihre (manifesten oder latenten) Indikatoren auflisten. Wir tun dies, indem wir den speziellen Operator "= ~" verwenden, der so gelesen werden kann, wie er von. Um beispielsweise die drei latenten Variablen f1, f2 und f3 zu definieren, können wir Folgendes verwenden:
+Wenn wir latente Variablen in einer der Regressionsformeln haben, müssen wir sie definieren, indem wir ihre (manifesten oder latenten) Indikatoren auflisten. Wir tun dies, indem wir den speziellen Operator "=~" verwenden.
 
 ```{r}
 "f1 =~ y1 + y2 + y3
@@ -36,7 +36,7 @@ f3 =~ y7 + y8 + y9 + y10"
 ```
 
 
-Darüber hinaus werden Varianzen und Kovarianzen mit einem 'Double Tilde'-Operator angegeben, zum Beispiel:
+Darüber hinaus werden Varianzen und Kovarianzen mit einem 'Double Tilde'-Operator angegeben, zum Beispiel so:
 
 ```{r}
 "y1 ~~ y1 # Varianz
@@ -45,7 +45,7 @@ f1 ~~ f2 # Kovarianz"
 ```
 
 
-Und schließlich, Abschnitte für beobachtete und latente Variablen sind einfache Regressionsformeln mit nur einem Schnittpunkt (explizit mit der Nummer '1' bezeichnet) als einziger Prädiktor:
+Intercepts für beobachtete und latente Variablen sind einfache Regressionsformeln mit nur einem Schnittpunkt (explizit mit der Nummer '1' bezeichnet):
 
 
 ```{r}
@@ -87,26 +87,27 @@ f1 ~ 1
 '
 ```
 
-Der Codeteil oben erzeugt ein Modell-Syntax-Objekt namens myModel, das später beim Aufruf einer Funktion verwendet werden kann, die dieses Modell bei einem Dataset tatsächlich schätzt. Beachten Sie, dass Formeln auf mehrere Zeilen aufgeteilt werden können. Sie können Kommentare (beginnend mit dem Zeichen #) und Leerzeilen innerhalb der einfachen Anführungszeichen verwenden, um die Lesbarkeit der Modellsyntax zu verbessern.
+Der Codeteil oben erzeugt ein Modell-Syntax-Objekt namens myModel.
 
 ## CFA
 
 Lasst uns zunächst einmal das Package `lavaan` einladen.
 
+(Und das `tidyverse` zu haben ist immer gut)
+
 ```{r}
-pacman::p_load(lavaan)
+pacman::p_load(tidyverse, lavaan)
 ```
 
 
-Wir beginnen mit einem einfachen Beispiel der konfirmatorischen Faktorenanalyse mit der Funktion cfa (), die eine benutzerfreundliche Funktion zur Anpassung von CFA-Modellen darstellt. Das lavaan-Paket enthält einen integrierten Datensatz namens HolzingerSwineford1939. Rufen Sie die Hilfeseite für dieses Dataset auf:
+Wir beginnen mit einem einfachen Beispiel der konfirmatorischen Faktorenanalyse mit der Funktion `cfa()`. Das lavaan-Paket enthält einen integrierten Datensatz namens `HolzingerSwineford1939`. Rufen Sie die Hilfeseite für dieses Dataset auf:
 
 ```{r}
 ?HolzingerSwineford1939
 ```
 
 
-
-Dies ist ein "klassischer" Datensatz, der in vielen Veröffentlichungen und Büchern über Strukturelle Gleichungsmodellierung (SEM) verwendet wird, einschließlich einiger Handbücher kommerzieller SEM-Softwarepakete. Die Daten bestehen aus Mentalfähigkeitstest-Scores von Kindern der siebten und achten Klasse aus zwei verschiedenen Schulen (Pasteur und Grant-White). In unserer Version des Datasets sind nur 9 der ursprünglichen 26 Tests enthalten. Ein CFA-Modell, das häufig für diese 9 Variablen vorgeschlagen wird, besteht aus drei latenten Variablen (oder Faktoren) mit jeweils drei Indikatoren:
+Die Daten bestehen aus Mentalfähigkeitstest-Scores von Kindern der siebten und achten Klasse aus zwei verschiedenen Schulen (Pasteur und Grant-White). In unserer Version des Datasets sind nur 9 der ursprünglichen 26 Tests enthalten. Ein CFA-Modell, das häufig für diese 9 Variablen vorgeschlagen wird, besteht aus drei latenten Variablen (oder Faktoren) mit jeweils drei Indikatoren:
 
 + ein visueller Faktor, der durch 3 Variablen gemessen wird: x1, x2 und x3
 + ein Textfaktor, der durch 3 Variablen gemessen wird: x4, x5 und x6
@@ -115,55 +116,407 @@ Dies ist ein "klassischer" Datensatz, der in vielen Veröffentlichungen und Büc
 Ein 3-Faktor-CFA-Beispiel Die entsprechende lavaan-Syntax zur Angabe dieses Modells lautet wie folgt:
 
 ```{r}
-"visuell = ~ x1 + x2 + x3
-textuell = ~ x4 + x5 + x6
-Geschwindigkeit = ~ x7 + x8 + x9"
+HS.model <- "visuell =~ x1 + x2 + x3
+             textuell =~ x4 + x5 + x6
+             Geschwindigkeit =~ x7 + x8 + x9"
 ```
 
 In diesem Beispiel enthält die Modellsyntax nur drei "latente Variablendefinitionen". Jede Formel hat folgendes Format:
 
 `latente Variable =~ Indikator1 + Indikator2 + Indikator3`
 
-Wir nennen diese Ausdrücke latente Variablendefinitionen, weil sie definieren, wie sich die latenten Variablen durch eine Menge beobachteter (oder manifester) Variablen manifestieren, die oft als "Indikatoren" bezeichnet werden. Beachten Sie, dass der spezielle Operator "=~" in der Mitte aus einem Zeichen ("=") und einer Tilde ("~") besteht, die nebeneinander stehen. Der Grund, warum diese Modell-Syntax so kurz ist, ist, dass die Funktion hinter den Kulissen mehrere Dinge erledigt. Erstens wird standardmäßig der Faktor, der den ersten Indikator einer latenten Variablen lädt, auf 1 festgelegt, wodurch der Maßstab der latenten Variablen festgelegt wird. Zweitens werden Restabweichungen automatisch hinzugefügt. Und drittens sind alle exogenen latenten Variablen standardmäßig korreliert. Auf diese Weise kann die Modell-Syntax kurz gehalten werden. Auf der anderen Seite behält der Benutzer die Kontrolle, da all dieses "Standard" -Verhalten überschrieben und / oder ausgeschaltet werden kann.
-
-Wir können die Modellsyntax unter Verwendung der einfachen Anführungszeichen eingeben:
+Wir können das Modell nun wie folgt berechnen:
 
 ```{r}
-HS.model <- "visuell = ~ x1 + x2 + x3
-textuell = ~ x4 + x5 + x6
-Geschwindigkeit = ~ x7 + x8 + x9"
-```
-
-Wir können das Modell nun wie folgt anpassen:
-
-
-```{r}
-fit <- cfa (HS.model, data = HolzingerSwineford1939)
+fit1 <- cfa(HS.model, data = HolzingerSwineford1939)
 ```
 
 
-Die Funktion cfa () ist eine dedizierte Funktion zur Anpassung konfirmatorischer Faktorenanalyse-Modelle. Das erste Argument ist das benutzerdefinierte Modell. Das zweite Argument ist der Datensatz, der die beobachteten Variablen enthält. Sobald das Modell angepasst wurde, bietet die Funktion summary () eine schöne Zusammenfassung des angepassten Modells:
+Die Funktion `cfa()` ist eine dedizierte Funktion zur Anpassung konfirmatorischer Faktorenanalyse-Modelle. Das erste Argument ist das benutzerdefinierte Modell. Das zweite Argument ist der Datensatz, der die beobachteten Variablen enthält. Sobald das Modell angepasst wurde, bietet die Funktion `summary()` eine schöne Zusammenfassung des angepassten Modells:
 
 
 ```{r}
-summary(fit, fit.measures = TRUE)
+summary(fit1, fit.measures = TRUE)
 ```
 
-Die Ausgabe besteht aus drei Teilen. Die ersten sechs Zeilen heißen Header. Der Header enthält folgende Informationen:
+## SEM
 
-+ die lavaan Versionsnummer
-+ lavaan konvergierte normal oder nicht und wie viele Iterationen wurden benötigt
-+ die Anzahl der Beobachtungen, die effektiv in der Analyse verwendet wurden
-+ der Schätzer, der verwendet wurde, um die Parameterwerte zu erhalten (hier: ML)
-+ die Modellteststatistik, die Freiheitsgrade und ein entsprechender p-Wert
+Ein volles Strukturgleichungsmodell kann sehr ähnlich und sehr einfach geschätzt werden. Hier ein Beispiel:
 
-Der nächste Abschnitt enthält zusätzliche Fit-Maße und wird nur angezeigt, weil wir das optionale Argument fit.measures = TRUE verwenden. Es beginnt mit dem Modell-Test-Basislinienmodell und endet mit dem Wert für SRMR. Der letzte Abschnitt enthält die Parameterschätzer. Es beginnt mit Informationen über die Standardfehler (wenn die Informationsmatrix erwartet oder beobachtet wird und wenn die Standardfehler Standard, Robust oder basierend auf dem Bootstrap sind). Dann tabelliert es alle freien (und festen) Parameter, die im Modell enthalten waren. Typischerweise werden zuerst die latenten Variablen gezeigt, gefolgt von Kovarianzen und (Rest-) Varianzen. Die erste Spalte (Schätzung) enthält den (geschätzten oder festen) Parameterwert für jeden Modellparameter; die zweite Spalte (Std.err) enthält den Standardfehler für jeden geschätzten Parameter; die dritte Spalte (Z-Wert) enthält die Wald-Statistik (die einfach durch Division des Parameterwerts durch ihren Standardfehler erhalten wird) und die letzte Spalte (P (> | z |)) enthält den p-Wert zum Testen der Null Hypothese, dass der Parameter in der Population gleich null ist.
+```{r}
+HS.model2 <- "visuell =~ x1 + x2 + x3
+             textuell =~ x4 + x5 + x6
+             Geschwindigkeit =~ x7 + x8 + x9
+             Geschwindigkeit ~ visuell"
+```
+
+Wir benutzen nun einfach die `sem()` Funktion um die Regression zu schätzen.
+
+```{r}
+fit2 <- sem(HS.model2, data = HolzingerSwineford1939)
+```
+
+Lassen wir uns doch einfach mal die `summary()` ausgeben:
+
+```{r}
+summary(fit2, fit.measures = TRUE, standardized = T, rsquare = T)
+
+```
+
+Wir können uns auch direkt die `fitmeasures()` ausgeben lassen:
+
+```{r}
+fitmeasures(fit2, c("chisq", "df", "rmsea", "cfi", "srmr"))
+```
+
+Oder die Koeffizienten/Ladungen:
+
+```{r}
+parameterEstimates(fit2)
+```
+
+### Modiciationindices
+
+Modiciationindices werden für jeden nicht freien (oder nichtredundanten) Parameter angezeigt. Die Modiciationindices werden um die Parameter der erwarteten Parameteränderung (`epc`) ergänzt. Die letzten drei Spalten enthalten die standardisierten EPC-Werte:
+
+`sepc.lv`: nur Standardisierung der latenten Variablen; 
+`sepc.all`: Standardisierung aller Variablen; 
+`sepc.nox`: Standardisierung aller nicht-exogenen manifesten Variablen
+
+```{r}
+modificationindices(fit2, sort. = T)
+```
+### Moderatoren
+
+Moderatoren zwischen manifesten Variablen zu erstellen ist ziemlich einfach. Wir können einfach eine Variable mal die andere Variable nehmen und diese als neue Variable abspeichern. Das sieht ungefähr so aus:
+
+```{r}
+HolzingerSwineford1939 %>% 
+  mutate(x1_x2 = x1 * x2)
+```
+
+Wollen wir allerdings eine Interaktion zwischen zwei latenten Variablen berechnen, müssen wir etwas komplexer vorgehen. Dazu brauchen wir die `indProd` Funktion aus dem `semTools` package.
+
+```{r}
+pacman::p_load(semTools)
+
+HolzingerSwineford1939 <- indProd(HolzingerSwineford1939, 
+              var1 = c("x1", "x2", "x3"), 
+              var2 = c("x4", "x5", "x6"))
+
+HS.model3 <- "visuell =~ x1 + x2 + x3
+             textuell =~ x4 + x5 + x6
+             Geschwindigkeit =~ x7 + x8 + x9
+
+             # interaction latent factor 
+             vis.text =~ x1.x4 + x2.x5 + x3.x6
+
+             Geschwindigkeit ~ visuell + textuell + vis.text"
+
+fit3 <- sem(HS.model3, data = HolzingerSwineford1939)
+
+summary(fit3)
+```
+
+Mehr zu Moderatoren:
+
++ https://rpubs.com/mkearney/103098
++ https://www.rdocumentation.org/packages/semTools/versions/0.5-0/topics/indProd
+
+### Nested Models
+
+Wenn wir ein sogenanntes *nested* Modell rechnen dann können wir mit Hilfe der `anova()` Funktion den Modellfit testen.
+
+```{r}
+anova(fit2, fit3)
+```
+
+**Ein signifikanter Chi Square Test zeigt, dass `fit3` besser fitted als `fit2`.
+
+```{r}
+fitmeasures(fit2, c("chisq", "df", "rmsea", "cfi", "srmr"))
+fitmeasures(fit3, c("chisq", "df", "rmsea", "cfi", "srmr"))
+```
+
+Wenn wir die Fitmeasures vergleichen kommen wir zur etwa gleichen Konklusion wie zuvor.
+
+### Mediation
+
+Das Beispiel veranschaulicht die Verwendung des Operators `:=` in der Lavan-Modell-Syntax. Dieser Operator definiert neue Parameter, die eine beliebige Funktion der ursprünglichen Modellparameter sind. Die Funktion muss jedoch in Bezug auf die Parameterbezeichnungen angegeben werden, die explizit in der Modellsyntax erwähnt werden. Standardmäßig werden die Standardfehler für diese definierten Parameter mit der so genannten Delta-Methode berechnet.
+
+```{r}
+HS.model4 <- "
+             # Faktor
+             Geschwindigkeit =~ x7 + x8 + x9
+
+             # direkter Effekt
+             Geschwindigkeit ~ c*x1
+
+             # mediator
+             x2 ~ a*x1
+             Geschwindigkeit ~ b*x2
+
+            # indirekter Effect (a*b)
+             ab := a*b
+
+            # total effect
+             total := c + (a*b)"
+
+fit4 <- sem(HS.model4, data = HolzingerSwineford1939)
+summary(fit4)
+```
 
 
-Einfach diesen Code kopieren und in R einfügen, sollte funktionieren. Die Syntax veranschaulicht den typischen Workflow im Paket "lavaan":
 
-1. Geben Sie Ihr Modell mit der Lavan-Modell-Syntax an. In diesem Beispiel wurden nur Definitionen für latente Variablen verwendet. In den folgenden Beispielen werden andere Formeltypen verwendet.
+## Growth
 
-2. Passen Sie das Modell an. Dies erfordert einen Datensatz, der die beobachteten Variablen (oder alternativ die Stichproben-Kovarianzmatrix und die Anzahl der Beobachtungen) enthält. In diesem Beispiel haben wir die Funktion cfa () verwendet. Andere Funktionen im lavaan-Paket sind sem () und growth () für die Anpassung von Modellen mit vollständiger Strukturgleichung bzw. Wachstumskurvenmodellen. Alle drei Funktionen sind so genannte benutzerfreundliche Funktionen, in dem Sinne, dass sie sich automatisch um viele Details kümmern, so dass wir die Modell-Syntax einfach und prägnant halten können. Wenn Sie nicht standardmäßige Modelle anpassen möchten oder wenn Ihnen die Idee, dass Dinge automatisch erledigt werden, nicht gefällt, können Sie stattdessen die untere Funktion lavaan () verwenden, wo Sie die volle Kontrolle haben.
+### Data
 
-3. Extrahieren Sie Informationen aus dem angepassten Modell. Dies kann eine lange ausführliche Zusammenfassung sein oder nur eine einzelne Zahl (z. B. der RMSEA-Wert). Im Sinne von R bekommen Sie nur, wonach Sie gefragt haben. Wir versuchen, keine unnötigen Informationen auszugeben, die Sie ohnehin ignorieren würden.
+```{r}
+lower <- '
+ 0.63 
+ 0.50 0.60 
+ 0.48 0.48 0.58
+ 0.47 0.48 0.51 0.67 
+-0.06 -0.07 -0.08 -0.09 0.24
+ 1.87 1.80 1.64 1.57 −0.04 64.04 
+ 1.16 1.11 1.04 0.93 −0.41 42.59 43.23 '
+
+cov_dat <- getCov(lower,  names = c("Time1", "Time2", "Time3", "Time4",
+                                    "State", "Poverty", "StPov"))
+
+cov_dat
+
+sample_means <- c(5.17, 5.32, 5.40, 5.52, 0.62, -1.67, -1.08)
+
+
+
+```
+
+### Schritt für Schritt
+
+#### 1. Latenter Intercept
+
+1. Modell für einen mittleren latenten Intercept und
+eingeschränkte Residualvarianzen.
+
+```{r}
+crime_model1 <- 
+  '# intercept
+   i =~ 1*Time1 + 1*Time2 + 1*Time3 + 1*Time4
+   i ~~ 0*i
+   # Residualvarianzen
+   Time1 ~~ r*Time1
+   Time2 ~~ r*Time2
+   Time3 ~~ r*Time3
+   Time4 ~~ r*Time4'
+
+crime_fit1 <- growth(crime_model1, 
+                     sample.cov = cov_dat,
+                     sample.mean = sample_means,
+                     sample.nobs = 952)
+
+summary(crime_fit1)
+```
+
+#### 2. Var. Latenter Intercept
+
+2. Modell für einen mittleren latenten Intercept, der variieren darf und Residualvarianzen beschränkt.
+
+```{r}
+crime_model2 <- 
+  '# intercept
+   i =~ 1*Time1 + 1*Time2 + 1*Time3 + 1*Time4
+   # Residualvarianzen
+   Time1 ~~ r*Time1
+   Time2 ~~ r*Time2
+   Time3 ~~ r*Time3
+   Time4 ~~ r*Time4'
+
+crime_fit2 <- growth(crime_model2, 
+                     sample.cov = cov_dat,
+                     sample.mean = sample_means,
+                     sample.nobs = 952)
+
+summary(crime_fit2)
+```
+
+##### Modellvergleich
+
+```{r}
+anova(crime_fit1, crime_fit2)
+```
+
+Fitmeasures Vergleich
+
+ + Little Helperfunction
+
+```{r}
+fit_m <- function(x) {
+  fitmeasures(x, c("chisq", "df", "rmsea", "cfi", "srmr", "AIC"))
+}
+
+fit_compare <- function(...) {
+  cbind(...) %>% 
+  data.frame() %>% 
+  rownames_to_column("fitmeasure") 
+}
+```
+
+
+```{r}
+fit_compare(fit_m(crime_fit1), 
+            fit_m(crime_fit2))
+```
+
+#### 3. Latenter Slope
+
+Modell mit einem mittleren latenten Intercept, der variieren darf, latente Steigung und eingeschränkten Varianzen
+
+```{r}
+crime_model3 <- 
+  '# intercept
+   i =~ 1*Time1 + 1*Time2 + 1*Time3 + 1*Time4
+   # steigung (slope)
+   s =~ 0*Time1 + 1*Time2 + 2*Time3 + 3*Time4
+   s ~ 0*1
+   s ~~ 0*i
+   # Residualvarianzen
+   Time1 ~~ r*Time1
+   Time2 ~~ r*Time2
+   Time3 ~~ r*Time3
+   Time4 ~~ r*Time4'
+
+crime_fit3 <- growth(crime_model3, 
+                     sample.cov = cov_dat,
+                     sample.mean = sample_means,
+                     sample.nobs = 952)
+
+summary(crime_fit3)
+```
+
+##### Modellvergleich
+
+```{r}
+anova(crime_fit1, crime_fit2, crime_fit3)
+```
+
+
+```{r}
+fit_compare(fit_m(crime_fit1), 
+            fit_m(crime_fit2), 
+            fit_m(crime_fit3))
+```
+
+
+#### 4. Var. Latenter Slope
+
+Modell mit einem mittleren latenten Intercept, der variieren darf, variiender latenter Steigung und eingeschränkten Varianzen
+
+```{r}
+crime_model4 <- 
+  '# intercept
+   i =~ 1*Time1 + 1*Time2 + 1*Time3 + 1*Time4
+   # steigung (slope)
+   s =~ 0*Time1 + 1*Time2 + 2*Time3 + 3*Time4
+   # Residualvarianzen
+   Time1 ~~ r*Time1
+   Time2 ~~ r*Time2
+   Time3 ~~ r*Time3
+   Time4 ~~ r*Time4'
+
+crime_fit4 <- growth(crime_model4, 
+                     sample.cov = cov_dat,
+                     sample.mean = sample_means,
+                     sample.nobs = 952)
+
+summary(crime_fit4)
+```
+
+##### Modellvergleich
+
+```{r}
+anova(crime_fit1, crime_fit2, crime_fit3, crime_fit4)
+```
+
+
+```{r}
+fit_compare(fit_m(crime_fit1), 
+            fit_m(crime_fit2), 
+            fit_m(crime_fit3), 
+            fit_m(crime_fit4))
+```
+
+
+#### 5. Uneingeschränkt
+
+```{r}
+crime_model5 <- 
+  '# intercept
+   i =~ 1*Time1 + 1*Time2 + 1*Time3 + 1*Time4
+   # steigung (slope)
+   s =~ 0*Time1 + 1*Time2 + 2*Time3 + 3*Time4'
+
+crime_fit5 <- growth(crime_model5, 
+                     sample.cov = cov_dat,
+                     sample.mean = sample_means,
+                     sample.nobs = 952)
+
+summary(crime_fit5)
+```
+
+
+##### Modellvergleich
+
+```{r}
+anova(crime_fit1, crime_fit2, 
+      crime_fit3, crime_fit4, 
+      crime_fit5)
+```
+
+
+```{r}
+fit_compare(fit_m(crime_fit1), 
+            fit_m(crime_fit2), 
+            fit_m(crime_fit3), 
+            fit_m(crime_fit4), 
+            fit_m(crime_fit5))
+```
+
+
+#### 6. Unabhängige Variablen
+
+```{r}
+crime_model6 <- 
+  '# intercept
+   i =~ 1*Time1 + 1*Time2 + 1*Time3 + 1*Time4
+   # steigung (slope)
+   s =~ 0*Time1 + 1*Time2 + 2*Time3 + 3*Time4
+   # regression
+   i + s ~ State + Poverty + StPov'
+
+crime_fit6 <- growth(crime_model6, 
+                     sample.cov = cov_dat,
+                     sample.mean = sample_means,
+                     sample.nobs = 952)
+
+summary(crime_fit6)
+```
+
+##### Modellvergleich
+
+```{r}
+anova(crime_fit1, crime_fit2, 
+      crime_fit3, crime_fit4, 
+      crime_fit5, crime_fit6)
+```
+
+
+```{r}
+fit_compare(fit_m(crime_fit1), 
+            fit_m(crime_fit2), 
+            fit_m(crime_fit3), 
+            fit_m(crime_fit4), 
+            fit_m(crime_fit5), 
+            fit_m(crime_fit6))
+```
