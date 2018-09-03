@@ -2,13 +2,13 @@
 
 **Ablauf**
 
-**09.00 - 10.30: Basics**
+**09.00 - 11.00: Basics**
 
 + Getting to know R/RStudio
 
 + Objekte, Operationen, Funktionen und Datenstrukturen
 
-**10.30 - 10.45: Pause**
+**11.00 - 11.45: Pause**
 
 **10.45 - 12.15: Das Tidyverse**
 
